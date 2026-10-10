@@ -175,19 +175,22 @@ input[type="text"]::placeholder { color: var(--muted); }
     busy = true; dl.disabled = true; dl.textContent = 'Starting…'; setMsg('');
     try {
       // ask the server first so a missing video shows a clear message
-      var res = await fetch('/dl?id=' + id + '&check=1');
-      if (res.status === 404) throw new Error('missing');
-      if (!res.ok) throw new Error('bad:' + (res.headers.get('x-cdn-status') || res.status));
+      var res = await fetch('/api/dl?id=' + id + '&check=1');
+      var cdn = res.headers.get('x-cdn-status');
+      if (!res.ok && !cdn) throw new Error('endpoint:' + res.status); // the /api/dl route itself failed
+      if (cdn === '404') throw new Error('missing');                    // the CDN says no such video
+      if (!res.ok) throw new Error('bad:' + cdn);
       // the server sends the file as an attachment, so the browser saves it directly
       var a = document.createElement('a');
-      a.href = '/dl?id=' + id;
+      a.href = '/api/dl?id=' + id;
       a.download = 'smolish-' + id + '.mp4';
       document.body.appendChild(a); a.click(); a.remove();
       setMsg('Download started. It will appear in your browser downloads.', 'ok');
     } catch (e) {
       if (e && e.message === 'missing') setMsg('That video could not be found. It may be private or removed.', 'bad');
       else if (e && e.message && e.message.indexOf('bad:') === 0) setMsg('The CDN refused the request (status ' + e.message.slice(4) + ').', 'bad');
-      else setMsg('Could not reach the downloader. Make sure server.js is running and open the page through it.', 'bad');
+      else if (e && e.message && e.message.indexOf('endpoint:') === 0) setMsg('The download endpoint is missing or broken (status ' + e.message.slice(9) + '). Make sure api/dl.js is deployed.', 'bad');
+      else setMsg('Could not reach the downloader. Check your connection and try again.', 'bad');
     } finally {
       busy = false; dl.disabled = false; dl.textContent = 'Download';
     }
