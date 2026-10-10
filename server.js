@@ -55,7 +55,7 @@ function text(res, status, body) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
 
-  if (url.pathname === '/dl') {
+  if (url.pathname === '/dl' || url.pathname === '/api/dl') {
     const id = url.searchParams.get('id') || '';
     if (!/^\d{6,25}$/.test(id)) return text(res, 400, 'Invalid video id');
 
