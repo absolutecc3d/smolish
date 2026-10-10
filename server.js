@@ -18,8 +18,16 @@ function fetchFromCdn(host, p, method, hops, cb) {
   let finished = false;
   const done = (err, res) => { if (!finished) { finished = true; cb(err, res); } };
 
+  // 'CHECK' = a GET for the first byte only (some CDNs reject HEAD requests)
+  const headers = {
+    'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+    referer: 'https://smolish.com/',
+    accept: '*/*',
+  };
+  if (method === 'CHECK') headers.range = 'bytes=0-0';
+
   const req = https.request(
-    { host, path: p, method, headers: { 'user-agent': 'smolish-downloader' } },
+    { host, path: p, method: method === 'CHECK' ? 'GET' : method, headers },
     (res) => {
       const loc = res.headers.location;
       if (res.statusCode >= 300 && res.statusCode < 400 && loc && hops < 3) {
@@ -54,13 +62,22 @@ const server = http.createServer((req, res) => {
     const checkOnly = url.searchParams.has('check');
     const cdnPath = '/videos/' + id + '/1080p.mp4';
 
-    const upReq = fetchFromCdn(CDN_HOST, cdnPath, checkOnly ? 'HEAD' : 'GET', 0, (err, up) => {
-      if (err) return text(res, 502, 'Could not reach the CDN');
-      if (up.statusCode !== 200) {
-        up.resume();
-        return text(res, up.statusCode === 404 || up.statusCode === 403 ? 404 : 502, 'Video not available');
+    const upReq = fetchFromCdn(CDN_HOST, cdnPath, checkOnly ? 'CHECK' : 'GET', 0, (err, up) => {
+      if (err) {
+        console.log('[' + id + '] could not reach CDN:', err.message);
+        return text(res, 502, 'Could not reach the CDN');
       }
-      if (checkOnly) { up.resume(); return text(res, 200, 'ok'); }
+      console.log('[' + id + '] CDN status', up.statusCode, checkOnly ? '(check)' : '(download)');
+      const ok = up.statusCode === 200 || (checkOnly && up.statusCode === 206);
+      if (!ok) {
+        up.resume();
+        res.writeHead(up.statusCode === 404 ? 404 : 502, {
+          'content-type': 'text/plain; charset=utf-8',
+          'x-cdn-status': String(up.statusCode),
+        });
+        return res.end('CDN returned status ' + up.statusCode);
+      }
+      if (checkOnly) { up.destroy(); return text(res, 200, 'ok'); }
 
       const headers = {
         'content-type': 'video/mp4',
