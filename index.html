@@ -1,0 +1,271 @@
+<title>Smolish Video Downloader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* layout: left-aligned column. Oversized wide-set wordmark, one combined link+download control, then a 16:9 stage for the video. */
+:root {
+  --bg: #f2f5fb;
+  --surface: #ffffff;
+  --ink: #0b1430;
+  --muted: #5a6685;
+  --line: #cdd6ea;
+  --accent: #1648e8;
+  --accent-ink: #ffffff;
+  --stage: #0b1430;
+  --stage-ink: #dfe7ff;
+  --ok: #0b7a4b;
+  --err: #c0261c;
+  --f-body: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #080d1c; --surface: #10172b; --ink: #e8edff; --muted: #8e9bbd; --line: #25304f;
+    --accent: #5b8cff; --accent-ink: #06102e; --stage: #04070f; --stage-ink: #dfe7ff;
+    --ok: #4fd39a; --err: #ff8e86;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #080d1c; --surface: #10172b; --ink: #e8edff; --muted: #8e9bbd; --line: #25304f;
+  --accent: #5b8cff; --accent-ink: #06102e; --stage: #04070f; --stage-ink: #dfe7ff;
+  --ok: #4fd39a; --err: #ff8e86;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.5;
+  padding-inline: clamp(16px, 6vw, 56px);
+  padding-block: clamp(32px, 9vh, 104px);
+}
+.wrap { max-width: 760px; margin: 0; }
+
+h1 { margin: 0 0 clamp(28px, 6vh, 48px); font-weight: 800; text-wrap: balance; }
+h1 .brand {
+  display: block;
+  font-size: clamp(3.4rem, 17vw, 8.4rem);
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  font-stretch: 125%;
+  color: var(--accent);
+}
+h1 .rest {
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(1.25rem, 4.6vw, 2.1rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-stretch: 125%;
+  font-weight: 500;
+}
+
+/* one control: link field + download button */
+.control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+}
+.control:focus-within { outline: 3px solid var(--accent); outline-offset: 3px; }
+.control.bad { border-color: var(--err); }
+.field { position: relative; flex: 1 1 240px; min-width: 0; }
+input[type="text"] {
+  width: 100%;
+  height: 100%;
+  min-height: 56px;
+  font: 400 1rem var(--f-mono);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 0 44px 0 14px;
+}
+input[type="text"]::placeholder { color: var(--muted); }
+.clear {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px; padding: 0;
+  background: transparent; color: var(--muted); border: 0; border-radius: 10px;
+  font: 400 1.5rem/1 var(--f-body); cursor: pointer;
+}
+.clear:hover { color: var(--ink); background: var(--bg); }
+.clear:focus-visible { outline: 3px solid var(--accent); }
+
+.dl {
+  position: relative;
+  overflow: hidden;
+  flex: 1 1 170px;
+  min-height: 56px;
+  padding: 0 28px;
+  font: 700 1.05rem var(--f-body);
+  letter-spacing: 0.01em;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 0;
+  border-radius: 11px;
+  cursor: pointer;
+}
+.dl:hover:not(:disabled) { filter: brightness(1.1); }
+.dl:active:not(:disabled) { transform: translateY(1px); }
+.dl:disabled { cursor: progress; }
+.dl:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.dl .fill {
+  position: absolute; inset: 0 auto 0 0; width: 0%;
+  background: var(--accent-ink); opacity: 0.28;
+}
+.dl .label { position: relative; font-variant-numeric: tabular-nums; }
+
+.msg { min-height: 1.6em; margin: 12px 4px 0; font-size: 0.92rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.msg.ok { color: var(--ok); }
+.msg.bad { color: var(--err); }
+.msg a { color: var(--accent); font-weight: 600; }
+
+@media (max-width: 480px) {
+  .dl { flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dl .fill { transition: width 0.15s linear; }
+  .dl { transition: filter 0.15s; }
+}
+</style>
+
+<main class="wrap">
+  <h1><span class="brand">Smolish</span><span class="rest">Video Downloader</span></h1>
+
+  <form id="f" novalidate>
+    <div class="control" id="control">
+      <div class="field">
+        <input type="text" id="link" name="link" aria-label="Smolish video link" autocomplete="off" autocapitalize="off" spellcheck="false"
+               placeholder="https://smolish.com/v/22491588051599360"
+               value="https://smolish.com/v/22491588051599360">
+        <button type="button" class="clear" id="clear" aria-label="Clear link">&times;</button>
+      </div>
+      <button type="submit" class="dl" id="dl"><span class="fill" id="fill"></span><span class="label" id="label">Download</span></button>
+    </div>
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+  </form>
+
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var link = $('link'), clearBtn = $('clear'), control = $('control'), msg = $('msg');
+  var dl = $('dl'), fill = $('fill'), label = $('label');
+  var currentId = null, busy = false;
+
+  function cdnUrl(id) { return 'https://cdn.smolish.com/videos/' + id + '/1080p.mp4'; }
+
+  function parse(text) {
+    var s = (text || '').trim();
+    if (/^\d{6,}$/.test(s)) return s;
+    var m = s.match(/smolish\.com\/v\/(\d+)/i);
+    return m ? m[1] : null;
+  }
+
+  function setMsg(text, cls) { msg.textContent = text; msg.className = 'msg' + (cls ? ' ' + cls : ''); }
+
+  function resetProgress() { fill.style.width = '0%'; label.textContent = 'Download'; }
+
+  function refresh() {
+    var raw = link.value.trim();
+    var id = parse(raw);
+    clearBtn.hidden = !raw;
+    if (id) {
+      control.classList.remove('bad'); link.removeAttribute('aria-invalid');
+      if (id !== currentId) {
+        currentId = id;
+        if (!busy) { resetProgress(); setMsg(''); }
+      }
+    } else {
+      currentId = null;
+      if (!busy) { resetProgress(); }
+      if (raw) {
+        control.classList.add('bad'); link.setAttribute('aria-invalid', 'true');
+        setMsg('That is not a Smolish video link. It should look like https://smolish.com/v/ followed by the video number.', 'bad');
+      } else {
+        control.classList.remove('bad'); link.removeAttribute('aria-invalid'); setMsg('');
+      }
+    }
+    return id;
+  }
+
+  function fmt(b) {
+    if (b > 1048576) return (b / 1048576).toFixed(1) + ' MB';
+    return Math.round(b / 1024) + ' KB';
+  }
+
+  async function download() {
+    var id = refresh();
+    if (!id || busy) return;
+    var url = cdnUrl(id);
+    busy = true; dl.disabled = true;
+    resetProgress(); label.textContent = 'Connecting…'; setMsg('');
+    try {
+      var res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var total = parseInt(res.headers.get('content-length') || '0', 10);
+      var chunks = [], got = 0;
+      if (res.body && res.body.getReader) {
+        var reader = res.body.getReader();
+        for (;;) {
+          var r = await reader.read();
+          if (r.done) break;
+          chunks.push(r.value); got += r.value.length;
+          if (total) {
+            var pct = Math.min(100, got / total * 100);
+            fill.style.width = pct.toFixed(1) + '%';
+            label.textContent = 'Downloading ' + Math.floor(pct) + '%';
+            setMsg(fmt(got) + ' of ' + fmt(total));
+          } else {
+            label.textContent = 'Downloading…';
+            setMsg(fmt(got) + ' downloaded');
+          }
+        }
+      } else {
+        var buf = await res.arrayBuffer();
+        chunks.push(new Uint8Array(buf)); got = buf.byteLength;
+      }
+      fill.style.width = '100%';
+      var blob = new Blob(chunks, { type: 'video/mp4' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'smolish-' + id + '.mp4';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000);
+      setMsg('Saved smolish-' + id + '.mp4 (' + fmt(got) + ')', 'ok');
+    } catch (e) {
+      /* direct download was blocked (CORS or sandbox): open the file itself instead */
+      var w = null;
+      try { w = window.open(url, '_blank'); if (w) w.opener = null; } catch (e2) { w = null; }
+      if (w) {
+        setMsg('Opened the video in a new tab. Press Ctrl+S (Cmd+S on Mac) there to save it.', 'ok');
+      } else {
+        msg.className = 'msg bad';
+        msg.textContent = 'The browser blocked a direct download. ';
+        var a2 = document.createElement('a');
+        a2.href = url; a2.target = '_blank'; a2.rel = 'noopener noreferrer';
+        a2.textContent = 'Open the video';
+        msg.appendChild(a2);
+        msg.appendChild(document.createTextNode(' and press Ctrl+S (Cmd+S on Mac) to save it.'));
+      }
+    } finally {
+      busy = false; dl.disabled = false; resetProgress();
+    }
+  }
+
+  $('f').addEventListener('submit', function (ev) { ev.preventDefault(); download(); });
+  link.addEventListener('input', refresh);
+  clearBtn.addEventListener('click', function () { link.value = ''; refresh(); link.focus(); });
+
+  refresh();
+})();
+</script>
