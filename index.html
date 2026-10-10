@@ -177,7 +177,7 @@ input[type="text"]::placeholder { color: var(--muted); }
       // ask the server first so a missing video shows a clear message
       var res = await fetch('/dl?id=' + id + '&check=1');
       if (res.status === 404) throw new Error('missing');
-      if (!res.ok) throw new Error('bad');
+      if (!res.ok) throw new Error('bad:' + (res.headers.get('x-cdn-status') || res.status));
       // the server sends the file as an attachment, so the browser saves it directly
       var a = document.createElement('a');
       a.href = '/dl?id=' + id;
@@ -186,7 +186,7 @@ input[type="text"]::placeholder { color: var(--muted); }
       setMsg('Download started. It will appear in your browser downloads.', 'ok');
     } catch (e) {
       if (e && e.message === 'missing') setMsg('That video could not be found. It may be private or removed.', 'bad');
-      else if (e && e.message === 'bad') setMsg('The CDN did not return the video. Try again in a moment.', 'bad');
+      else if (e && e.message && e.message.indexOf('bad:') === 0) setMsg('The CDN refused the request (status ' + e.message.slice(4) + ').', 'bad');
       else setMsg('Could not reach the downloader. Make sure server.js is running and open the page through it.', 'bad');
     } finally {
       busy = false; dl.disabled = false; dl.textContent = 'Download';
